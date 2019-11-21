@@ -1,0 +1,223 @@
+---
+title: "Iris Feasibility Report"
+author: "Christina H Thai"
+date: "5/25/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load Dataset
+Installing necessary librarys
+```{r}
+library(e1071)
+library(caTools)
+library(ggplot2)
+library(gridExtra)
+library(grid)
+```
+
+Attaching the data and extracting the predictors into x and species classification to y
+```{r}
+dat= iris
+```
+#Splitting Data into Training and Test Set
+We seek to split the data into two sets: the training set, which we will build our model with, and the test set, which we will test our model with. We want the training set to be 80% of our data (of each species). This leaves our training set to have 120 subjects and 30 subjects in our test set.
+```{r}
+split = sample.split(dat$Species, SplitRatio = .8)
+training_set = subset(dat, split == TRUE)
+test_set = subset(dat, split == FALSE)
+
+nrow(training_set)
+```
+
+#Exploratory Visualization
+Using ggplot and GGally, we can look ,ore closely at the parameters and judge if a good model can be created or not. 
+```{r}
+# Let's plot all the variables in a single visualization that will contain all the boxplots
+
+
+BpSl <- ggplot(iris, aes(Species, Sepal.Length, fill=Species)) + 
+        geom_boxplot()+
+        scale_y_continuous("Sepal Length (cm)", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+
+
+
+BpSw <-  ggplot(iris, aes(Species, Sepal.Width, fill=Species)) + 
+          geom_boxplot()+
+          scale_y_continuous("Sepal Width (cm)", breaks= seq(0,30, by=.5))+
+          theme(legend.position="none")
+
+
+
+BpPl <- ggplot(iris, aes(Species, Petal.Length, fill=Species)) + 
+        geom_boxplot()+
+        scale_y_continuous("Petal Length (cm)", breaks= seq(0,30, by=.5))+
+        theme(legend.position="none")
+        
+
+
+BpPw <-  ggplot(iris, aes(Species, Petal.Width, fill=Species)) + 
+        geom_boxplot()+
+        scale_y_continuous("Petal Width (cm)", breaks= seq(0,30, by=.5))+
+        labs(title = "Iris Box Plot", x = "Species")
+
+
+
+# Plot all visualizations
+grid.arrange(BpSl  + ggtitle(""),
+             BpSw  + ggtitle(""),
+             BpPl + ggtitle(""),
+             BpPw + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Sepal and Petal Box Plot", 
+                            gp=gpar(fontsize=15))
+)
+```
+
+
+
+
+
+
+```{r}
+pdf("data_visualize_hist.pdf")
+# Sepal length 
+HisSl <- ggplot(data=iris, aes(x=Sepal.Length))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Species)) + 
+  xlab("Sepal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Sepal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(Sepal.Length)),linetype="dashed",color="grey")
+
+
+# Sepal width
+HistSw <- ggplot(data=iris, aes(x=Sepal.Width)) +
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Species)) + 
+  xlab("Sepal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Sepal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(Sepal.Width)),linetype="dashed",color="grey")
+
+
+# Petal length
+HistPl <- ggplot(data=iris, aes(x=Petal.Length))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Species)) + 
+  xlab("Petal Length (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="none")+
+  ggtitle("Histogram of Petal Length")+
+  geom_vline(data=iris, aes(xintercept = mean(Petal.Length)),
+             linetype="dashed",color="grey")
+
+# Petal width
+HistPw <- ggplot(data=iris, aes(x=Petal.Width))+
+  geom_histogram(binwidth=0.2, color="black", aes(fill=Species)) + 
+  xlab("Petal Width (cm)") +  
+  ylab("Frequency") + 
+  theme(legend.position="right" )+
+  ggtitle("Histogram of Petal Width")+
+  geom_vline(data=iris, aes(xintercept = mean(Petal.Width)),linetype="dashed",color="grey")
+
+
+# Plot all visualizations
+grid.arrange(HisSl + ggtitle(""),
+             HistSw + ggtitle(""),
+             HistPl + ggtitle(""),
+             HistPw  + ggtitle(""),
+             nrow = 2,
+             top = textGrob("Iris Frequency Histogram", 
+                            gp=gpar(fontsize=15))
+)
+
+
+dev.off()
+
+```
+
+We can clearly see from the Histograms of Petal.length and Petal.width that we can clearly seperate out Setosa species with very high confidence.
+
+However, Versicolor and Virginica Species are overlapped. If we look at the scatterplot of Sepal.Length vs Petal.Length and Petal.Width vs Petal.Length, we can distintly see a seperator that can be draw between the groups of Species.
+
+Looks like we can just use Petal.Width and Petal.Length as parameters and come with a good model. SVM seems to be a very good model for this type of data. Lets create two model, one contains all parameter and second contain just Petal.Width and Petal.Length as parameter and compare their individual performances.
+
+#Linear Discriminant Analysis
+
+##Model Fit and Summary
+```{r}
+library(MASS)
+lda_model = lda(Species ~ Petal.Length + Petal.Width, dat)
+```
+
+##Model Prediction
+```{r}
+pred1 <- predict(lda_model,type = "response", newdata = test_set[-5])
+system.time(pred1 <- predict(lda_model,type = "response", newdata = test_set[-5]))
+```
+
+##Accuracy
+```{r}
+table(test_set[,5],lda_prediction = pred1$class)
+```
+
+
+
+#Neural Networks
+##Model Fit and Summary
+```{r, warning = FALSE}
+library(neuralnet)
+NN_model <- neuralnet(Species ~ Petal.Length + Petal.Width, data = training_set, hidden=c(10,10), rep = 5, err.fct = "ce", linear.output = F, lifesign = "minimal", stepmax = 1000000, threshold = 0.001)
+
+plot(NN_model, rep = "best")
+```
+
+
+##Model Prediction
+```{r}
+pred2 <- compute(NN_model, test_set[-5])
+                 
+system.time(pred2 <- compute(NN_model, test_set[-5]))
+
+```
+
+##Accuracy
+```{r}
+idx <- apply(pred2$net.result, 1, which.max)
+predicted2 <- c('setosa', 'versicolor', 'virginica')[idx]
+table(test_set[,5],predicted2)
+
+```
+
+
+#SVM Classification
+
+#Model Fit and Summary
+Create the SVM model and show summary
+```{r}
+svm_model <- svm(Species ~ Petal.Length + Petal.Width, data=training_set)
+summary(svm_model)
+```
+
+##Model Prediction
+Prediction and executtion time in R.
+```{r}
+pred3 <- predict(svm_model,type = "response", newdata = test_set[-5])
+system.time(pred3 <- predict(svm_model,type = "response", newdata = test_set[-5]))
+```
+
+##Accuracy
+Confusion matrix result from prediction, 
+```{r}
+table(test_set[,5],SVM_Prediction = pred3)
+mis <- 2/30
+```
+Misclassification error is `r mis`
+
+
